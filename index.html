@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Speech Fun Games</title>
+<meta name="theme-color" content="#ff6fb3">
+<style>
+  :root{
+    --pink:#ff6fb3;--pink2:#ffc6e0;--bg1:#ffe6f3;--bg2:#fdf6ff;--good:#22c55e;--bad:#ef4444;--ink:#433;
+    --speaker-size:48px;
+    --imgW: 90%; --imgH: 75%; /* keep choice & reveal images same size */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:ui-rounded,system-ui,Segoe UI,Roboto,sans-serif;color:var(--ink)}
+  body{background:radial-gradient(900px 600px at 10% 10%,#fff 0,#fff0 60%),linear-gradient(135deg,var(--bg1),var(--bg2))}
+  button{border:none;background:var(--pink);color:#fff;font-weight:800;padding:10px 14px;border-radius:14px;cursor:pointer}
+  button.secondary{background:#fff;color:#333;border:2px solid var(--pink)}
+  header.appbar{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:14px 18px;border-bottom:3px solid var(--pink2);background:#fff}
+  .leftbar{display:flex;gap:8px;align-items:center}
+  .title{font-weight:900;color:var(--pink)}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+  .chip{background:var(--pink2);border-radius:999px;padding:6px 10px;font-weight:800;color:#7a3e57}
+
+  /* tiles */
+  .gamegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:16px;max-width:1800px;margin:0 auto}
+  .tile{aspect-ratio:1/1;background:#fff;border:3px solid var(--pink2);border-radius:22px;position:relative;overflow:hidden;
+        display:grid;grid-template-rows:1fr auto;place-items:center}
+  .tile-inner{align-self:center;justify-self:center;display:grid;place-items:center;width:100%;height:100%}
+  .art{display:grid;place-items:center;width:100%;height:100%}
+  .art img,.reveal img{max-width:var(--imgW);max-height:var(--imgH);object-fit:contain;display:block;margin:auto}
+
+  /* menu */
+  .menu-wrap{max-width:1000px;margin:32px auto;padding:0 16px}
+  .menu-card{background:#fff;border:3px solid var(--pink2);border-radius:22px;padding:28px;display:grid;gap:18px;justify-items:center}
+  .menu-title{font-size:28px;color:var(--pink);font-weight:1000;margin:0}
+  .menu-buttons{display:grid;grid-template-columns:1fr;gap:14px;width:100%}
+  .bigbtn{font-size:18px;padding:16px 18px;border-radius:18px}
+
+  /* B/V visuals */
+  .choice.correct{box-shadow:0 0 0 4px rgba(34,197,94,.35) inset}
+  .choice.wrong{box-shadow:0 0 0 4px rgba(239,68,68,.35) inset}
+  .mystery{border-style:dashed;cursor:pointer}
+  .qm{font-size:clamp(120px, 11vw, 180px);font-weight:1000;color:#ff3c9b}
+  .reveal{position:absolute;inset:0;display:grid;place-items:center;opacity:0;transition:opacity .25s ease;pointer-events:none}
+  .reveal.show{opacity:1}
+  .speaker-cell{display:flex;justify-content:center;align-items:flex-start;margin-top:-6px}
+  .speaker-btn{background:transparent;border:none;padding:0;cursor:pointer}
+  .speaker-btn img{width:var(--speaker-size);height:var(--speaker-size);display:block}
+
+  /* Treat jar */
+  .count{position:absolute;top:10px;left:10px;font-weight:900;font-size:14px;background:var(--pink2);padding:6px 10px;border-radius:999px;z-index:4}
+  .treats{position:absolute;inset:0;pointer-events:auto;overflow:hidden;z-index:3}
+  .candy{position:absolute;font-size:28px;cursor:grab;user-select:none;touch-action:none}
+  .candy:active{cursor:grabbing}
+  .puppy{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:160px;height:auto;pointer-events:none;opacity:.98;z-index:2}
+  .fly{position:fixed;width:42px;height:42px;z-index:9999;pointer-events:none;font-size:42px}
+  .shake{animation:shake .3s linear}
+  @keyframes shake{0%,100%{transform:translateY(0)}25%{transform:translateY(-6px)}75%{transform:translateY(6px)}}
+
+  /* WRONG MARK */
+  .markX{
+    position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:5;
+    animation:pop .18s ease-out;
+  }
+  .markX span{
+    font-size:clamp(120px, 12vw, 220px);
+    color:#ff2a2a;
+    text-shadow:0 0 8px rgba(255,0,0,.25), 0 2px 0 #fff, 0 -2px 0 #fff, 2px 0 0 #fff, -2px 0 0 #fff;
+    line-height:1;
+  }
+  @keyframes pop{from{transform:scale(.7);opacity:.4}to{transform:scale(1);opacity:1}}
+
+  /* Clock vs Snake */
+  .clock-hand{position:absolute;inset:0;margin:auto;transform-origin:50% 50%}
+  .clock-spin{animation:spin .6s ease-in-out}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+  /* Orientation rules */
+  @media (max-width: 900px) and (orientation: portrait) { .gamegrid{grid-template-columns:1fr} }
+  @media (orientation: landscape) { .gamegrid{grid-template-columns:repeat(4, minmax(0,1fr))} }
+  @media (max-height: 450px) and (orientation: landscape) {
+    .gamegrid{gap:8px;padding:8px}
+    header.appbar{padding:8px 10px}
+    button{padding:8px 10px}
+  }
+
+  /* Views */
+  .view{display:none}
+  .view.active{display:block}
+</style>
+</head>
+<body>
+
+<!-- MAIN MENU -->
+<section id="viewMenu" class="view active">
+  <header class="appbar">
+    <div class="leftbar">
+      <!-- (empty on menu) -->
+    </div>
+    <div class="title">Speech Games</div>
+    <div></div>
+  </header>
+  <div class="menu-wrap">
+    <div class="menu-card">
+      <h1 class="menu-title">Pick a Game</h1>
+      <div class="menu-buttons">
+        <button class="bigbtn" id="goBV">Which Sound: B or V?</button>
+        <button class="bigbtn" id="goCS">Lateral Lisp: ⏰ vs 🐍</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- B OR V GAME -->
+<section id="viewBV" class="view">
+  <header class="appbar">
+    <div class="leftbar">
+      <button id="backFromBV" class="secondary">← Menu</button>
+    </div>
+    <div class="title">B or V?</div>
+    <div class="controls">
+      <span class="chip" id="setName">Set: —</span>
+      <button id="btnChange" class="secondary">Change Set</button>
+      <button id="btnReset" class="secondary">Reset</button>
+      <button id="btnPuppy" class="secondary">Change Puppy</button>
+      <span class="chip" id="puppyBadge">Puppy: 1</span>
+    </div>
+  </header>
+
+  <main class="gamegrid">
+    <div class="tile choice" id="leftChoice"><div class="tile-inner"><div class="art pic"></div></div></div>
+    <section class="tile mystery" id="mystery" title="Tap to hear the word">
+      <div class="tile-inner">
+        <div class="qm" id="qm">?</div>
+        <div class="reveal" id="reveal"></div>
+      </div>
+    </section>
+    <div class="tile choice" id="rightChoice"><div class="tile-inner"><div class="art pic"></div></div></div>
+    <aside class="tile jar" id="jar">
+      <div class="count">Treats: <span id="treatCount">0</span></div>
+      <div class="treats" id="treats"></div>
+      <img src="" alt="puppy" class="puppy" id="puppyImg" />
+    </aside>
+
+    <!-- Speaker buttons below columns 1 & 3 -->
+    <div class="speaker-cell" style="grid-column:1">
+      <button id="speakerLeftBtn" class="speaker-btn" data-side="left" title="Hear left">
+        <img alt="Hear left" src="icons/speaker_darkpink_48px.png"
+             srcset="icons/speaker_darkpink_32px.png 1x, icons/speaker_darkpink_48px.png 1.5x, icons/speaker_darkpink_64px.png 2x">
+      </button>
+    </div>
+    <div class="speaker-cell" style="grid-column:3">
+      <button id="speakerRightBtn" class="speaker-btn" data-side="right" title="Hear right">
+        <img alt="Hear right" src="icons/speaker_darkpink_48px.png"
+             srcset="icons/speaker_darkpink_32px.png 1x, icons/speaker_darkpink_48px.png 1.5x, icons/speaker_darkpink_64px.png 2x">
+      </button>
+    </div>
+  </main>
+</section>
+
+<!-- CLOCK VS SNAKE -->
+<section id="viewCS" class="view">
+  <header class="appbar">
+    <div class="leftbar">
+      <button id="backFromCS" class="secondary">← Menu</button>
+    </div>
+    <div class="title">Clock vs Snake</div>
+    <div class="controls">
+      <button id="btnTreatCS" class="secondary">Give Treat 🍬</button>
+      <button id="btnRecordCS" class="secondary">🎤 Record</button>
+      <button id="btnPlayCS" class="secondary" disabled>▶️ Play Back</button>
+      <button id="btnPuppyCS" class="secondary">Change Puppy 🐶</button>
+      <span class="chip" id="puppyBadgeCS">Puppy: 1</span>
+    </div>
+  </header>
+  <main class="gamegrid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="tile" id="clockTile">
+      <div class="tile-inner">
+        <div class="art">
+          <img class="clock-face" src="images/clock.png" alt="clock face">
+          <img class="clock-hand" id="clockHand" src="images/clock_hand.png" alt="hand">
+        </div>
+      </div>
+    </div>
+    <div class="tile" id="snakeTile">
+      <div class="tile-inner">
+        <div class="art">
+          <img class="snake" id="snakeImg" src="images/snake.png" alt="snake">
+        </div>
+      </div>
+    </div>
+    <aside class="tile jar" id="jarCS">
+      <div class="count">Treats: <span id="treatCountCS">0</span></div>
+      <div class="treats" id="treatsCS"></div>
+      <img class="puppy" id="puppyCS" src="" alt="puppy">
+    </aside>
+  </main>
+  <audio id="audioGoodCS" src="audio/clock.wav" preload="auto"></audio>
+  <audio id="audioBadCS"  src="audio/snake.wav" preload="auto"></audio>
+</section>
+
+<script>
+/* ---------- View Router ---------- */
+const views = {menu: document.getElementById('viewMenu'), bv: document.getElementById('viewBV'), cs: document.getElementById('viewCS')};
+function showView(name){ Object.values(views).forEach(v=>v.classList.remove('active')); views[name].classList.add('active'); }
+document.getElementById('goBV').onclick = ()=>showView('bv');
+document.getElementById('goCS').onclick = ()=>showView('cs');
+document.getElementById('backFromBV').onclick = ()=>showView('menu');
+document.getElementById('backFromCS').onclick = ()=>showView('menu');
+
+/* ---------- Shared Puppy Selection & Bark Audio (robust) ---------- */
+const PUPPIES_DEF = [
+  { src: "images/puppy1.png", bark: "audio/bark1.wav" },
+  { src: "images/puppy2.png", bark: "audio/bark2.wav" },
+  { src: "images/puppy3.png", bark: "audio/bark3.wav" },
+];
+const PUPPY_KEY = "sf_selected_puppy_index";
+
+const puppyImg     = document.getElementById('puppyImg');
+const puppyBadge   = document.getElementById('puppyBadge');
+const puppyCS      = document.getElementById('puppyCS');
+const puppyBadgeCS = document.getElementById('puppyBadgeCS');
+const btnPuppy     = document.getElementById('btnPuppy');
+const btnPuppyCS   = document.getElementById('btnPuppyCS');
+
+let availablePups = []; // indices that actually load
+let puppyIndex = 0;     // current index into PUPPIES_DEF
+
+function detectAvailablePuppies(){
+  return Promise.all(
+    PUPPIES_DEF.map((p, i) => new Promise(resolve => {
+      const test = new Image();
+      test.onload  = () => resolve(i);
+      test.onerror = () => resolve(null);
+      test.src = p.src + "?v=" + Date.now(); // bypass cache to avoid stale 404s
+    }))
+  ).then(results => {
+    availablePups = results.filter(i => i !== null);
+    if (availablePups.length === 0) availablePups = [0]; // fallback to first
+  });
+}
+function posInAvailable(idx){ const pos = availablePups.indexOf(idx); return pos === -1 ? 0 : pos; }
+function nextAvailable(idx){ const pos = posInAvailable(idx); return availablePups[(pos + 1) % availablePups.length]; }
+
+function applyPuppy(idx){
+  puppyIndex = idx;
+  const p = PUPPIES_DEF[puppyIndex];
+
+  const onErr = () => {
+    // if this puppy fails now, drop it from available and move on
+    if (availablePups.length > 1) {
+      availablePups = availablePups.filter(i => i !== puppyIndex);
+      applyPuppy(availablePups[0]);
+    }
+  };
+
+  if (puppyImg)  { puppyImg.onerror = onErr;  puppyImg.src  = p.src; }
+  if (puppyCS)   { puppyCS.onerror  = onErr;  puppyCS.src   = p.src; }
+
+  const badgeNum = posInAvailable(puppyIndex) + 1;
+  if (puppyBadge)   puppyBadge.textContent   = `Puppy: ${badgeNum}`;
+  if (puppyBadgeCS) puppyBadgeCS.textContent = `Puppy: ${badgeNum}`;
+
+  localStorage.setItem(PUPPY_KEY, String(puppyIndex));
+}
+function cyclePuppy(){ applyPuppy(nextAvailable(puppyIndex)); }
+if (btnPuppy)   btnPuppy.addEventListener('click', cyclePuppy);
+if (btnPuppyCS) btnPuppyCS.addEventListener('click', cyclePuppy);
+
+// initialize
+(async () => {
+  await detectAvailablePuppies();
+  const saved = parseInt(localStorage.getItem(PUPPY_KEY), 10);
+  const initial = availablePups.includes(saved) ? saved : availablePups[0];
+  applyPuppy(initial);
+})();
+
+// simple bark helper (per-puppy if present)
+function playBark(){
+  const bark = (PUPPIES_DEF[puppyIndex] && PUPPIES_DEF[puppyIndex].bark) ? PUPPIES_DEF[puppyIndex].bark : "audio/bark.wav";
+  new Audio(bark).play().catch(()=>{});
+}
+
+/* --- audio cache helpers (used by games/cheers/boos) --- */
+const AUDIO_CACHE = new Map();
+function cacheAudio(url){
+  if(!url || AUDIO_CACHE.has(url)) return;
+  const link=document.createElement('link'); link.rel='preload'; link.as='audio'; link.href=url; document.head.appendChild(link);
+  const a=new Audio(); a.src=url; a.preload='auto'; a.load(); AUDIO_CACHE.set(url,a);
+}
+function playCached(url){
+  if(!url) return;
+  const base=AUDIO_CACHE.get(url);
+  (base?base.cloneNode(true):new Audio(url)).play().catch(()=>{});
+}
+/* cheer/boo & default bark */
+const SND_GOOD='audio/good.wav', SND_BAD='audio/bad.wav';
+const DEFAULT_BARK = 'audio/bark.wav';
+[SND_GOOD,SND_BAD,DEFAULT_BARK].forEach(cacheAudio);
+
+/* ===================== B/V GAME ===================== */
+const SETS=[
+  {name:"best vs vest",a:{word:"best",img:"images/best.png",audio:"audio/best.wav"},b:{word:"vest",img:"images/vest.png",audio:"audio/vest.wav"}},
+  {name:"boat vs vote",a:{word:"boat",img:"images/boat.png",audio:"audio/boat.wav"},b:{word:"vote",img:"images/vote.png",audio:"audio/vote.wav"}},
+  {name:"ban vs van", a:{word:"ban", img:"images/ban.png", audio:"audio/ban.wav"}, b:{word:"van", img:"images/van.png", audio:"audio/van.wav"}},
+  {name:"bee vs vee", a:{word:"bee", img:"images/bee.png", audio:"audio/bee.wav"}, b:{word:"vee", img:"images/vee.png", audio:"audio/vee.wav"}},
+];
+const $=s=>document.querySelector(s);
+const leftEl=$('#leftChoice'), rightEl=$('#rightChoice');
+const mystery=$('#mystery'), revealEl=$('#reveal'), qmEl=$('#qm');
+const setBadge=$('#setName'), treatsLayer=$('#treats'), jar=$('#jar');
+const treatCountEl=$('#treatCount');
+const btnChange=$('#btnChange'), btnReset=$('#btnReset');
+const leftBtn=document.getElementById('speakerLeftBtn');
+const rightBtn=document.getElementById('speakerRightBtn');
+
+const stateBV={
+  setIndex:0, correctKey:'a', leftKey:'a', heard:false, resolving:false, treats:0,
+  correctSide:null, targetWord:null, targetImg:null, targetAudio:null,
+  lastCorrectKey:null, runLen:0
+};
+function currentSet(){ return SETS[stateBV.setIndex]; }
+function preloadBV(){ const urls=new Set(); SETS.forEach(s=>['a','b'].forEach(k=>urls.add(s[k].audio))); urls.forEach(cacheAudio); }
+function playAudioBV(url){ playCached(url); }
+
+function renderOptions(){
+  const set=currentSet();
+  const rightKey = stateBV.leftKey==='a' ? 'b' : 'a';
+  const L = set[stateBV.leftKey]; const R = set[rightKey];
+  const Lpic = leftEl.querySelector('.pic');  Lpic.innerHTML=''; const Li=document.createElement('img'); Li.src=L.img; Li.alt=L.word; Lpic.appendChild(Li);
+  const Rpic = rightEl.querySelector('.pic'); Rpic.innerHTML=''; const Ri=document.createElement('img'); Ri.src=R.img; Ri.alt=R.word; Rpic.appendChild(Ri);
+  leftEl.dataset.audio = L.audio; rightEl.dataset.audio= R.audio;
+  stateBV.correctSide = (stateBV.leftKey === stateBV.correctKey) ? 'left' : 'right';
+}
+function resetMystery(){ revealEl.classList.remove('show'); revealEl.innerHTML=''; qmEl.textContent='?'; }
+function pickNextCorrectKey(){
+  let next = Math.random()<0.5 ? 'a' : 'b';
+  if (stateBV.lastCorrectKey && stateBV.runLen >= 3) next = stateBV.lastCorrectKey==='a' ? 'b' : 'a'; // ≤ 3 in a row
+  return next;
+}
+function newRound(){
+  stateBV.heard=false; stateBV.resolving=false; resetMystery();
+  stateBV.correctKey = pickNextCorrectKey();
+  stateBV.leftKey = Math.random()<0.5 ? 'a' : 'b';
+  const set=currentSet(), target=set[stateBV.correctKey];
+  stateBV.targetWord=target.word; stateBV.targetImg=target.img; stateBV.targetAudio=target.audio;
+  renderOptions();
+  leftEl.classList.remove('correct','wrong'); rightEl.classList.remove('correct','wrong');
+  // remove any prior X marks
+  document.querySelectorAll('.markX').forEach(n=>n.remove());
+  if (stateBV.lastCorrectKey === stateBV.correctKey) stateBV.runLen = (stateBV.runLen||0)+1; else { stateBV.lastCorrectKey=stateBV.correctKey; stateBV.runLen=1; }
+}
+function showReveal(){
+  const img=document.createElement('img'); img.src=stateBV.targetImg; img.alt=stateBV.targetWord;
+  revealEl.innerHTML=''; revealEl.appendChild(img); revealEl.classList.add('show'); qmEl.textContent='';
+}
+function handleMystery(){ playAudioBV(stateBV.targetAudio); stateBV.heard=true; }
+
+function addBigX(el){
+  const m=document.createElement('div'); m.className='markX';
+  const s=document.createElement('span'); s.textContent='✖'; m.appendChild(s);
+  el.appendChild(m);
+}
+function createDraggableCandyBV(x, y){
+  const c=document.createElement('div'); c.className='candy'; c.textContent='🍬'; c.style.left=x+'px'; c.style.top=y+'px';
+  treatsLayer.appendChild(c);
+  let startX=0,startY=0,origX=0,origY=0;
+  const onDown=(e)=>{
+    const p = e.touches ? e.touches[0] : e;
+    startX=p.clientX; startY=p.clientY;
+    const rect=c.getBoundingClientRect(); const jrect=jar.getBoundingClientRect();
+    origX=rect.left-jrect.left; origY=rect.top-jrect.top;
+    e.preventDefault();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, {once:true});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp, {once:true});
+  };
+  const onMove=(e)=>{
+    const p = e.touches ? e.touches[0] : e;
+    const dx=p.clientX-startX, dy=p.clientY-startY;
+    const jrect=jar.getBoundingClientRect();
+    let nx=origX+dx, ny=origY+dy;
+    const maxX=jrect.width-40, maxY=jrect.height-40;
+    nx=Math.max(0, Math.min(nx, maxX)); ny=Math.max(0, Math.min(ny, maxY));
+    c.style.left=nx+'px'; c.style.top=ny+'px'; e.preventDefault();
+  };
+  const onUp=()=>{
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('touchmove', onMove);
+    const r=c.getBoundingClientRect(); const m=puppyImg.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    if(cx>=m.left && cx<=m.right && cy>=m.top && cy<=m.bottom){
+      playBark();
+      c.animate([{transform:'scale(1)'},{transform:'scale(0)'}],{duration:200, easing:'ease-out'}).onfinish=()=>c.remove();
+    }
+  };
+  c.addEventListener('pointerdown', onDown, {passive:false});
+  c.addEventListener('touchstart', onDown, {passive:false});
+  return c;
+}
+function dropTreatFromBV(fromEl){
+  stateBV.treats+=1; treatCountEl.textContent=stateBV.treats;
+  const rectFrom = fromEl.getBoundingClientRect(); const jrect = jar.getBoundingClientRect();
+  const sx = rectFrom.left + rectFrom.width/2, sy = rectFrom.top + rectFrom.height/2;
+  const ex = jrect.left + jrect.width/2, ey = jrect.top + jrect.height/2 - 10;
+  const fly=document.createElement('div'); fly.className='fly'; fly.textContent='🍬'; document.body.appendChild(fly);
+  fly.style.left=(sx-21)+'px'; fly.style.top=(sy-21)+'px';
+  const anim=fly.animate([
+    {transform:'translate(0,0) scale(1) rotate(0deg)'},
+    {transform:`translate(${(ex-sx)*0.6}px, ${(ey-sy)*0.6}px) scale(1.1) rotate(200deg)`, offset:0.6},
+    {transform:`translate(${ex-sx}px, ${ey-sy}px) scale(0.85) rotate(360deg)`}
+  ], {duration:850, easing:'cubic-bezier(.2,.7,.2,1)'});
+  anim.onfinish=()=>{
+    fly.remove();
+    const rx = 20 + Math.random()*(jrect.width-60);
+    const ry = 60 + Math.random()*80;
+    createDraggableCandyBV(rx, ry);
+  };
+}
+
+/* wire B/V */
+leftEl.addEventListener('click', (e)=>{ if (e.target.closest('.speaker-btn')) return; if (!stateBV.heard){ leftEl.classList.add('shake'); setTimeout(()=>leftEl.classList.remove('shake'),300); return; } checkBV('left'); });
+rightEl.addEventListener('click',(e)=>{ if (e.target.closest('.speaker-btn')) return; if (!stateBV.heard){ rightEl.classList.add('shake'); setTimeout(()=>rightEl.classList.remove('shake'),300); return; } checkBV('right'); });
+function checkBV(side){
+  if(stateBV.resolving || !stateBV.heard) return; stateBV.resolving=true;
+  const correct=(side===stateBV.correctSide);
+  const pickEl=side==='left'?leftEl:rightEl; const otherEl=side==='left'?rightEl:leftEl;
+  if(correct){
+    pickEl.classList.add('correct');
+    playCached(SND_GOOD);
+    dropTreatFromBV(pickEl);
+  }else{
+    pickEl.classList.add('wrong');
+    addBigX(pickEl);
+    playCached(SND_BAD);
+    otherEl.classList.remove('wrong');
+  }
+  showReveal(); setTimeout(()=>newRound(),1200);
+}
+/* speakers */
+[leftBtn, rightBtn].forEach(btn=>{
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const side = btn.getAttribute('data-side');
+    const target = side==='left' ? leftEl : rightEl;
+    playAudioBV(target.dataset.audio);
+  });
+});
+mystery.addEventListener('click',()=>{ playAudioBV(stateBV.targetAudio); stateBV.heard=true; });
+document.getElementById('btnChange').addEventListener('click',()=>{ stateBV.setIndex=(stateBV.setIndex+1)%SETS.length; setBadge.textContent='Set: '+currentSet().name; stateBV.lastCorrectKey=null; stateBV.runLen=0; preloadBV(); newRound(); });
+document.getElementById('btnReset').addEventListener('click',()=>{ stateBV.treats=0; treatCountEl.textContent=0; document.getElementById('treats').innerHTML=''; stateBV.lastCorrectKey=null; stateBV.runLen=0; });
+
+setBadge.textContent='Set: '+currentSet().name;
+preloadBV(); newRound();
+
+/* ================= CLOCK vs SNAKE ================= */
+const clockTile=document.getElementById('clockTile');
+const snakeTile=document.getElementById('snakeTile');
+const clockHand=document.getElementById('clockHand');
+const snakeImg=document.getElementById('snakeImg');
+const btnTreatCS=document.getElementById('btnTreatCS');
+const btnRecordCS=document.getElementById('btnRecordCS');
+const btnPlayCS=document.getElementById('btnPlayCS');
+const jarCS=document.getElementById('jarCS');
+const treatsLayerCS=document.getElementById('treatsCS');
+const treatCountCS=document.getElementById('treatCountCS');
+
+cacheAudio('audio/clock.wav'); cacheAudio('audio/snake.wav');
+
+clockTile.addEventListener('click',()=>{
+  clockHand.classList.remove('clock-spin'); void clockHand.offsetWidth; clockHand.classList.add('clock-spin');
+  playCached('audio/clock.wav');
+});
+snakeTile.addEventListener('click',()=>{
+  playCached('audio/snake.wav');
+  const orig='images/snake.png', withTongue='images/snake_with_tongue.png';
+  snakeImg.src = withTongue; setTimeout(()=>{ snakeImg.src = orig; }, 300);
+});
+
+btnTreatCS.addEventListener('click', ()=> dropTreatFromCS(btnTreatCS));
+
+function createDraggableCandyCS(x, y){
+  const c=document.createElement('div'); c.className='candy'; c.textContent='🍬'; c.style.left=x+'px'; c.style.top=y+'px';
+  treatsLayerCS.appendChild(c);
+  let startX=0,startY=0,origX=0,origY=0;
+  const onDown=(e)=>{
+    const p = e.touches ? e.touches[0] : e; startX=p.clientX; startY=p.clientY;
+    const rect=c.getBoundingClientRect(); const jrect=jarCS.getBoundingClientRect();
+    origX=rect.left-jrect.left; origY=rect.top-jrect.top; e.preventDefault();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, {once:true});
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp, {once:true});
+  };
+  const onMove=(e)=>{
+    const p = e.touches ? e.touches[0] : e;
+    const dx=p.clientX-startX, dy=p.clientY-startY;
+    const jrect=jarCS.getBoundingClientRect();
+    let nx=origX+dx, ny=origY+dy;
+    const maxX=jrect.width-40, maxY=jrect.height-40;
+    nx=Math.max(0, Math.min(nx, maxX)); ny=Math.max(0, Math.min(ny, maxY));
+    c.style.left=nx+'px'; c.style.top=ny+'px'; e.preventDefault();
+  };
+  const onUp=()=>{
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('touchmove', onMove);
+    const r=c.getBoundingClientRect(); const m=puppyCS.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    if(cx>=m.left && cx<=m.right && cy>=m.top && cy<=m.bottom){
+      playBark();
+      c.animate([{transform:'scale(1)'},{transform:'scale(0)'}],{duration:200, easing:'ease-out'}).onfinish=()=>c.remove();
+    }
+  };
+  c.addEventListener('pointerdown', onDown, {passive:false});
+  c.addEventListener('touchstart', onDown, {passive:false});
+  return c;
+}
+function dropTreatFromCS(fromEl){
+  treatCountCS.textContent = (+treatCountCS.textContent)+1;
+  const rectFrom = fromEl.getBoundingClientRect(); const jrect = jarCS.getBoundingClientRect();
+  const sx = rectFrom.left + rectFrom.width/2, sy = rectFrom.top + rectFrom.height/2;
+  const ex = jrect.left + jrect.width/2, ey = jrect.top + jrect.height/2 - 10;
+  const fly=document.createElement('div'); fly.className='fly'; fly.textContent='🍬'; document.body.appendChild(fly);
+  fly.style.left=(sx-21)+'px'; fly.style.top=(sy-21)+'px';
+  const anim=fly.animate([
+    {transform:'translate(0,0) scale(1) rotate(0deg)'},
+    {transform:`translate(${(ex-sx)*0.6}px, ${(ey-sy)*0.6}px) scale(1.1) rotate(200deg)`, offset:0.6},
+    {transform:`translate(${ex-sx}px, ${ey-sy}px) scale(0.85) rotate(360deg)`}
+  ], {duration:800, easing:'cubic-bezier(.2,.7,.2,1)'});
+  anim.onfinish=()=>{
+    fly.remove(); const rx = 20 + Math.random()*(jrect.width-60); const ry = 60 + Math.random()*80; createDraggableCandyCS(rx, ry);
+  };
+}
+
+/* Mic (local playback) */
+let mediaRecorderCS, chunksCS=[], audioURLCS=null;
+async function startRecordingCS(){
+  try{
+    const stream= await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorderCS = new MediaRecorder(stream);
+    chunksCS=[];
+    mediaRecorderCS.ondataavailable = e=>{ if(e.data.size>0) chunksCS.push(e.data); };
+    mediaRecorderCS.onstop = ()=>{
+      const blob = new Blob(chunksCS, {type:'audio/webm'});
+      if (audioURLCS) URL.revokeObjectURL(audioURLCS);
+      audioURLCS = URL.createObjectURL(blob);
+      document.getElementById('btnPlayCS').disabled=false;
+    };
+    mediaRecorderCS.start();
+    btnRecordCS.textContent='⏹ Stop';
+  }catch(err){ alert('Microphone access denied or not available.'); }
+}
+function stopRecordingCS(){ if(mediaRecorderCS && mediaRecorderCS.state!=='inactive'){ mediaRecorderCS.stop(); } btnRecordCS.textContent='🎤 Record'; }
+btnRecordCS.addEventListener('click',()=>{ if(!mediaRecorderCS || mediaRecorderCS.state==='inactive'){ startRecordingCS(); } else { stopRecordingCS(); } });
+btnPlayCS.addEventListener('click', ()=>{ if(audioURLCS) new Audio(audioURLCS).play(); });
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+    });
+  }
+  </script>
+  </body>
+</html>
